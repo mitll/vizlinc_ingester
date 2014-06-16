@@ -1,0 +1,167 @@
+<project name="vizlinc-ingester" default="all" basedir=".">
+
+  <description>
+    Build Groovy vizlinc-ingester jar
+  </description>
+
+  <!-- Windows pathnames -->
+  <property name="username" value="yourid"/>
+  <condition property="vizlincdb.dir.string" value="C:/Users/${username}/Documents/NetBeansProjects/vizlincdb/target">
+    <os family="windows"/>
+  </condition>
+
+  <condition property="groovy.dir.string" value="C:/Users/${username}/Desktop/Java/groovy-1.8.9">
+    <os family="windows"/>
+  </condition>
+
+  <condition property="gremlin-groovy.dir.string" value="C:/Users/${username}/Desktop/Java/gremlin-groovy-2.4.0">
+    <os family="windows"/>
+  </condition>
+
+  <condition property="launch4j.available">
+    <os family="windows"/>
+  </condition>
+
+  <condition property="launch4j.dir.string" value="C:/Program Files (x86)/Launch4j">
+    <os family="windows"/>
+  </condition>
+
+  <!-- Unix pathnames -->
+  <property name="userid" value="yourid"/>
+  <condition property="vizlincdb.dir.string" value="/home/${userid}/NetBeansProjects/vizlincdb/target">
+    <os family="unix"/>
+  </condition>
+
+  <condition property="groovy.dir.string" value="/home/${userid}/code/groovy-1.8.9">
+    <os family="unix"/>
+  </condition>
+
+  <condition property="gremlin-groovy.dir.string" value="/home/${userid}/code/gremlin-groovy-2.4.0">
+    <os family="unix"/>
+  </condition>
+
+  <!-- Set a bogus value to avoid ant errors -->
+  <condition property="launch4j.dir.string" value="/not/available">
+    <os family="unix"/>
+  </condition>
+
+
+  <!-- set global properties for this build -->
+  <property name="src" location="src"/>
+  <property name="build" location="build"/>
+  <property name="dist"  location="dist"/>
+  <property name="lib"  location="lib"/>
+  <property name="data"  location="data"/>
+  <property name="vizlincdb.dir" location="${vizlincdb.dir.string}"/>
+  <property name="groovy.dir" location="${groovy.dir.string}"/>
+  <property name="gremlin-groovy.dir" location="${gremlin-groovy.dir.string}"/>
+
+  <property name="launch4j.dir" location="${launch4j.dir.string}"/>
+
+
+  <!-- jars needed to run groovy -->
+  <!-- Use the groovy-all version, to avoid version conflicts with jars required by other ingester pieces. -->
+  <fileset id="groovy-all.jars" dir="${groovy.dir}/embeddable">
+    <include name="*.jar"/>
+  </fileset>
+
+  <!-- jars needed to run Gremlin -->
+  <fileset id="gremlin-groovy.jars" dir="${gremlin-groovy.dir}/lib">
+    <include name="*.jar"/>
+    <exclude name="groovy*.jar"/>
+  </fileset>
+
+  <!-- external jars needed for ingester -->
+  <fileset id="ingester.jars" dir="${lib}">
+    <include name="*.jar"/>
+  </fileset>
+
+  <!-- vizlincdb required jars -->
+  <fileset id="vizlincdb.jars" dir="${vizlincdb.dir}">
+    <!-- the main vizlincdb jar, e.g. vizlincdb-x.0.SNAPSHOT.jar -->
+    <include name="*.jar"/>
+    <!-- the jars vizlincdb depends on -->
+    <include name="lib/*.jar"/>
+  </fileset>
+
+  <union id="all-needed-jars">
+    <resources refid="groovy-all.jars"/>
+    <resources refid="gremlin-groovy.jars"/>
+    <resources refid="ingester.jars"/>
+    <resources refid="vizlincdb.jars"/>
+  </union>
+  
+  <!-- Compile using groovy, all needed jars, and the source files. -->
+  <path id="classpath.groovyc">
+    <!-- groovy source -->
+    <pathelement path="${src}"/>
+    <pathelement path="${build}"/>
+    <resources refid="all-needed-jars"/>
+  </path>
+
+  <!-- How to compile using groovy. -->
+  <taskdef name="groovyc"
+         classname="org.codehaus.groovy.ant.Groovyc"
+         classpathref="classpath.groovyc" />
+
+
+  <target name="init">
+    <!-- Create the build directory structure used by compile -->
+    <mkdir dir="${build}"/>
+  </target>
+
+
+  <target name="compile" depends="init" description="compile the source ">
+    <!-- Debugging classpath value:
+	<property name="classpath.groovyc" refid="classpath.groovyc"/>
+	<echo message="***classpath.groovyc=${classpath.groovyc}"/>
+    -->
+    <!-- Compile the groovy code from ${src} into ${build} -->
+    <groovyc srcdir="${src}" destdir="${build}"/>
+  </target>
+
+
+  <target name="dist" depends="compile"
+        description="generate the distribution" >
+    <!-- Create the distribution directory -->
+    <mkdir dir="${dist}/lib"/>
+    <mkdir dir="${dist}/data"/>
+
+    <!-- Put everything in ${build} into vizlinc-ingester.jar -->
+    <jar jarfile="${dist}/lib/vizlinc-ingester.jar" basedir="${build}"/>
+
+    <!-- Copy all the library dependencies. Flatten means don't create subdirs. -->
+    <copy todir="${dist}/lib" flatten="true">
+      <resources refid="all-needed-jars"/>
+    </copy>
+
+    <!-- Copy all data files -->
+    <copy todir="${dist}/data">
+      <fileset dir="${data}"/>
+    </copy>
+  </target>
+
+  <target name="launch4j" depends="dist" if="launch4j.available">
+    <taskdef name="launch4j"
+	     classname="net.sf.launch4j.ant.Launch4jTask"
+	     classpath="${launch4j.dir}/launch4j.jar:${launch4j.dir}/lib/xstream.jar" />
+    <launch4j configFile="vizlinc-ingester-launch4j.xml"/>
+  </target>
+
+  <target name="all" depends="dist,launch4j">
+  </target>
+
+  <target name="zip" depends="all">
+    <zip destfile="vizlinc-ingester.zip">
+      <zipfileset prefix="vizlinc-ingester" dir="dist" />
+    </zip>
+  </target>
+
+  <target name="clean"
+        description="clean up" >
+    <!-- Delete the ${build} and ${dist} directory trees -->
+    <delete dir="${build}"/>
+    <delete dir="${dist}"/>
+  </target>
+
+</project>

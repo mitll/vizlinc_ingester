@@ -1,0 +1,10 @@
+*~
+log_*.txt
+dist/
+build/
+logs/
+work/
+*.log
+*.graphml
+*.txt
+*.zip
